@@ -1,4 +1,4 @@
-package app.backend.compressor;
+package app.backend.compression;
 
 import java.util.regex.*;
 import java.util.*;
@@ -18,7 +18,7 @@ public class Compressor {
     // ── Compression rules ─────────────────────────────────────────────────
     // Ordered: longest/most specific patterns first to avoid partial matches.
     // Each entry is { regexPattern, replacement }
-    private static final String[][] COMPRESSION_MAP = {
+    private final String[][] COMPRESSION_MAP = {
 
         // ── Verbose instruction patterns ──────────────────────────────────
         { "(?i)\\b(provide|give|write|draft)\\s+(a|an|the)\\s+(detailed|thorough|complete)\\s+(explanation|description|summary)\\s+of\\b", "explain" },
@@ -99,7 +99,7 @@ public class Compressor {
      * @param text  sentence-simplified text from Simplifier
      * @return      compressed text with filler removed
      */
-    public static String compress(String text) {
+    public String compress(String text) {
         String result = text;
         for (String[] rule : COMPRESSION_MAP) {
             result = applyRule(result, rule[0], rule[1]);
@@ -108,7 +108,7 @@ public class Compressor {
     }
 
     // ── Apply a single regex rule ─────────────────────────────────────────
-    private static String applyRule(String text, String pattern, String replacement) {
+    private String applyRule(String text, String pattern, String replacement) {
         try {
             return Pattern.compile(pattern).matcher(text).replaceAll(replacement);
         } catch (Exception e) {
@@ -120,7 +120,7 @@ public class Compressor {
     // ── Final cleanup ─────────────────────────────────────────────────────
     // Collapses multiple spaces left behind by deletions
     // and trims leading/trailing whitespace
-    private static String cleanup(String text) {
+    private String cleanup(String text) {
         return text.replaceAll("\\s{2,}", " ").trim();
     }
 }

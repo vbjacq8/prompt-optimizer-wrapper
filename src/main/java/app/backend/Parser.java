@@ -3,6 +3,10 @@ package app.backend;
 import edu.stanford.nlp.pipeline.*;
 import edu.stanford.nlp.trees.*;
 import edu.stanford.nlp.util.*;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+//import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.ling.Label;
+import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations; 
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -45,6 +49,8 @@ public class Parser {
      *   parse     — builds constituency parse tree from POS-tagged tokens
      */
     public Parser() {
+        System.out.println("Parser CONSTRUCTED!!!");
+
         Properties props = new Properties();
         props.setProperty("annotators", "tokenize,ssplit,pos,parse");
         props.setProperty("parse.model",
@@ -70,12 +76,14 @@ public class Parser {
         pipeline.annotate(doc);
 
         List<Tree> trees = new ArrayList<>();
-        for (CoreMap sentence : doc.get(CoreAnnotations.SentencesAnnotation.class)) {
-            Tree tree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
+        for (CoreMap sentence : doc.get(SentencesAnnotation.class)) {
+            Tree tree = sentence.get(TreeAnnotation.class);
             if (tree != null) {
                 trees.add(tree);
             }
         }
+        System.out.println("TREES: " + trees.size());
+        for (Tree t : trees) System.out.println(t);
         return trees;
     }
 
@@ -88,29 +96,28 @@ public class Parser {
      * @return      plain text string
      */
     public static String treeToString(Tree tree) {
-        if (tree == null) return "";
+    if (tree == null) return "";
 
-        List<Label> leaves = tree.yield();
-        if (leaves == null || leaves.isEmpty()) return "";
+    List<Label> leaves = tree.yield();
+    if (leaves == null || leaves.isEmpty()) return "";
 
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < leaves.size(); i++) {
-            String word = leaves.get(i).value();
-            if (word == null || word.isEmpty()) continue;
-            // Don't prepend space before punctuation
-            if (i > 0 && !word.matches("[.,!?;:)'\"\\]%-]")) {
-                sb.append(" ");
-            }
-            sb.append(word);
+    // Add this check
+    if (leaves.size() == 0) return "";
+
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < leaves.size(); i++) {
+        String word = leaves.get(i).value();
+        if (word == null || word.isEmpty()) continue;
+        if (i > 0 && !word.matches("[.,!?;:)'\"\\]%-]")) {
+            sb.append(" ");
         }
-
-        String result = sb.toString().trim();
-
-        // Capitalize first character
-        if (!result.isEmpty()) {
-            result = Character.toUpperCase(result.charAt(0)) + result.substring(1);
-        }
-
-        return result;
+        sb.append(word);
     }
+
+    String result = sb.toString().trim();
+    if (!result.isEmpty()) {
+        result = Character.toUpperCase(result.charAt(0)) + result.substring(1);
+    }
+    return result;
+}
 }
