@@ -36,6 +36,17 @@
             <version>4.5.5</version>
         </dependency>
 
+        <!-- Models jar — required, separate download -->
+        <dependency>
+            <groupId>edu.stanford.nlp</groupId>
+            <artifactId>stanford-corenlp</artifactId>
+            <version>4.5.5</version>
+            <classifier>models</classifier>
+        </dependency>
+
+
+        
+
         <!-- jtokkit — tiktoken token counting in Java (no Python needed) -->
         <dependency>
             <groupId>com.knuddels</groupId>
