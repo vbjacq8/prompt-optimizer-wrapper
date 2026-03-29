@@ -1,4 +1,4 @@
-package ui;
+package app;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
