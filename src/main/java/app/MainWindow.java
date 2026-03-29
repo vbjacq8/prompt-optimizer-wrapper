@@ -253,12 +253,12 @@ public class MainWindow {
         });
 
         task.setOnFailed(e -> {
-    Throwable ex = task.getException();
-    ex.printStackTrace(); // prints full stack trace to terminal
-    setStatus("ERROR: " + ex.getMessage());
-    btnOptimize.setDisable(false);
-    btnOptimize.setText("⚡  OPTIMIZE");
-});
+            Throwable ex = task.getException();
+            ex.printStackTrace(); // prints full stack trace to terminal
+            setStatus("ERROR: " + ex.getMessage());
+            btnOptimize.setDisable(false);
+            btnOptimize.setText("⚡  OPTIMIZE");
+            });
 
         Thread t = new Thread(task);
         t.setDaemon(true);

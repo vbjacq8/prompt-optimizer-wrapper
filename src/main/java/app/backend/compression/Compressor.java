@@ -85,6 +85,21 @@ public class Compressor {
         { "(?i)\\bw/o\\b", "without" },
         { "(?i)\\bw/\\b", "with" },
         { "(?i)\\bapprox\\b", "~" },
+        // Add these to your COMPRESSION_MAP array:
+
+        // 1. Better Conjunction Handling (The ampersand is great for tokens)
+        { "(?i)\\b(and|plus|along\\s+with)\\b", "&" },
+
+        // 2. Technical Shorthand (Very high density)
+        { "(?i)\\b(artificial\\s+intelligence)\\b", "AI" },
+        { "(?i)\\b(machine\\s+learning)\\b", "ML" },
+
+        // 3. Verbose "Identification" patterns
+        { "(?i)\\b(identify|find|detect|spot|locate)\\b", "find" },
+
+        // 4. Cleanup for the "red- underlined" bug
+        // This ensures that if the Simplifier leaves "red - underlined", we snap it back.
+        { "\\s*-\\s*", "-" },
 
         // ── Accidental word repeats ───────────────────────────────────────
         // "the the" -> "the"
@@ -121,6 +136,11 @@ public class Compressor {
     // Collapses multiple spaces left behind by deletions
     // and trims leading/trailing whitespace
     private String cleanup(String text) {
-        return text.replaceAll("\\s{2,}", " ").trim();
+        if (text == null) return "";
+        return text
+            .replaceAll("\\s{2,}", " ")           // Double spaces -> single
+            .replaceAll("\\s+([.,!?;:])", "$1")    // "word ." -> "word."
+            .replaceAll("([.,!?;:])\\1+", "$1")    // Remove accidental double punctuation
+            .trim();
     }
 }
