@@ -7,7 +7,7 @@ import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 //import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.Label;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
-
+import edu.stanford.nlp.pipeline.Annotation;
 import java.util.*;
 
 /**

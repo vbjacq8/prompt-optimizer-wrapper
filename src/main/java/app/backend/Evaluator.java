@@ -80,6 +80,8 @@ public class Evaluator {
         public final String compressed;
         public final int originalTokens;
         public final int compressedTokens;
+        public double fidelity;
+        public double perplexity;
 
         public EvaluationResult(String original, String compressed,
                                 int originalTokens, int compressedTokens) {
