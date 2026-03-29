@@ -1,2 +1,13 @@
 venv/
-temp
+temp/
+pom.xml
+
+
+# Maven
+target/
+# IDE specific files
+.idea/
+.project
+.classpath
+.settings/
+*.iml
