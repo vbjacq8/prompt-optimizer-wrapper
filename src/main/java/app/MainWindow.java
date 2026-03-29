@@ -13,8 +13,19 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
+import app.backend.compression.Compressor;
+import app.backend.compression.Simplifier;
+import app.backend.Evaluator;
+import app.backend.Parser;
+
 
 public class MainWindow {
+
+    // ── Utility Objects  ───────────────────────────────────────────────────────
+    private final Parser parser         = new Parser();
+    private final Simplifier simplifier = new Simplifier();
+    private final Compressor compressor = new Compressor();
+    private final Evaluator evaluator   = new Evaluator();
 
     // ── Root layout ───────────────────────────────────────────────────────
     private final BorderPane root = new BorderPane();
@@ -200,13 +211,25 @@ public class MainWindow {
         Task<CompressionResult> task = new Task<>() {
             @Override
             protected CompressionResult call() {
+                System.out.println("INPUT: " + text);
+    String simplified = simplifier.simplify(parser.parse(text));
+    System.out.println("SIMPLIFIED: " + simplified);
+    String compressed = compressor.compress(simplified);
+    System.out.println("COMPRESSED: " + compressed);
+    Evaluator.EvaluationResult evalResult = evaluator.evaluate(text, compressed);
+    return new CompressionResult(
+        text, compressed,
+        evalResult.originalTokens,
+        evalResult.compressedTokens
+    );
+
                 // ── WIRE YOUR BACKEND HERE ────────────────────────────────
                 // Replace mockCompress() with:
                 //   String compressed = RegexCompressor.compress(text);
                 //   compressed = Simplifier.simplify(compressed);
                 //   int[] tokens = TokenEvaluator.evaluate(text, compressed);
                 //   return new CompressionResult(text, compressed, tokens[0], tokens[1]);
-                return mockCompress(text);
+                //return mockCompress(text);
             }
         };
 
@@ -230,10 +253,12 @@ public class MainWindow {
         });
 
         task.setOnFailed(e -> {
-            setStatus("ERROR: " + task.getException().getMessage());
-            btnOptimize.setDisable(false);
-            btnOptimize.setText("⚡  OPTIMIZE");
-        });
+    Throwable ex = task.getException();
+    ex.printStackTrace(); // prints full stack trace to terminal
+    setStatus("ERROR: " + ex.getMessage());
+    btnOptimize.setDisable(false);
+    btnOptimize.setText("⚡  OPTIMIZE");
+});
 
         Thread t = new Thread(task);
         t.setDaemon(true);

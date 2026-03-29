@@ -41,12 +41,12 @@ public class Simplifier {
             "replace root inner"
         },
 
-        // Rule 2: Politeness modal stripping
-        {
-            "S=root < (NP < (PRP < /(?i)you/)) "
-          + "< (VP=vp < MD < VP=content)",
-            "replace root content"
-        },
+        // Rule 2: Politeness modal stripping — FIXED
+{
+    "S|SQ=root < (NP < (PRP < /(?i)you/)) "
+    + "< (VP=vp < MD < VP=content)",
+    "replace root content"
+},
 
         // Rule 3: Expletive it removal
         {
@@ -136,21 +136,32 @@ public class Simplifier {
 
     // ── Apply all rules in sequence ───────────────────────────────────────
     private Tree applyAllRules(Tree tree) {
-        for (String[] rule : RULES) {
-            tree = applyRule(tree, rule[0], rule[1]);
-        }
-        return tree;
-    }
-
-    // ── Single rule application ───────────────────────────────────────────
-    private Tree applyRule(Tree tree, String tregexPattern, String tsurgeonOp) {
-        try {
-            TregexPattern pattern     = TregexPattern.compile(tregexPattern);
-            TsurgeonPattern operation = Tsurgeon.parseOperation(tsurgeonOp);
-            return Tsurgeon.processPattern(pattern, operation, tree);
-        } catch (Exception e) {
-            // If rule fails, return tree unchanged — never crash the pipeline
+    for (String[] rule : RULES) {
+        tree = applyRule(tree, rule[0], rule[1]);
+        // Stop processing if tree has been reduced to nothing
+        if (tree == null || tree.yield() == null || tree.yield().isEmpty()) {
             return tree;
         }
     }
+    return tree;
+}
+
+    // ── Single rule application ───────────────────────────────────────────
+    private Tree applyRule(Tree tree, String tregexPattern, String tsurgeonOp) {
+    try {
+        TregexPattern pattern     = TregexPattern.compile(tregexPattern);
+        TsurgeonPattern operation = Tsurgeon.parseOperation(tsurgeonOp);
+        Tree result = Tsurgeon.processPattern(pattern, operation, tree);
+        // Debug — print which rule fired
+        if (!result.toString().equals(tree.toString())) {
+            System.out.println("RULE FIRED: " + tsurgeonOp);
+            System.out.println("BEFORE: " + tree);
+            System.out.println("AFTER:  " + result);
+        }
+        return result;
+    } catch (Exception e) {
+        System.out.println("RULE ERROR: " + tsurgeonOp + " — " + e.getMessage());
+        return tree;
+    }
+}
 }
