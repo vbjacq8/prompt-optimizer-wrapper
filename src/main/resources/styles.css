@@ -6,7 +6,7 @@
 /* ── Typography ──────────────────────────────────────────────────────────── */
 .title {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 20px;
+    -fx-font-size: 22px;
     -fx-font-weight: bold;
     -fx-text-fill: #32903cff;
     -fx-letter-spacing: 3px;
@@ -14,20 +14,20 @@
 
 .subtitle {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 10px;
+    -fx-font-size: 12px;
     -fx-text-fill: #141403ff;
     -fx-letter-spacing: 3px;
 }
 
 .status {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 11px;
+    -fx-font-size: 13px;
     -fx-text-fill: #1f9a3aff;
 }
 
 .section-label {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 10px;
+    -fx-font-size: 12px;
     -fx-font-weight: bold;
     -fx-text-fill: #269546ff;
     -fx-letter-spacing: 2px;
@@ -44,16 +44,35 @@
 }
 
 .card-label {
-    -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 9px;
+    -fx-font-size: 12px;
+    -fx-text-fill: #269546ff; /* Light grey */
     -fx-font-weight: bold;
-    -fx-text-fill: #0b0b0aff;
+}
+
+.card-value {
+    -fx-font-size: 22px;
+    -fx-text-fill: #ffffff; /* White */
+    -fx-font-weight: bold;
+}
+
+.stat-card {
+    -fx-background-color: #2a2a2a;
+    -fx-background-radius: 5;
+    -fx-border-color: #3f3f3f;
+    -fx-border-radius: 5;
+}
+
+.card-label {
+    -fx-font-family: "Helvetica Neue";
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #269546ff;
     -fx-letter-spacing: 1px;
 }
 
 .card-value {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 22px;
+    -fx-font-size: 24px;
     -fx-font-weight: bold;
     -fx-text-fill: #2daa63ff;
 }
@@ -63,7 +82,7 @@
     -fx-background-color: #FFFFFF;
     -fx-text-fill: #1a1919ff;
     -fx-font-family: "Verdana";
-    -fx-font-size: 13px;
+    -fx-font-size: 15px;
     -fx-border-color: #3c3c37ff;
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
@@ -98,7 +117,7 @@
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn {
     -fx-font-family: "Helvetica Neue";
-    -fx-font-size: 11px;
+    -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-letter-spacing: 1px;
     -fx-border-radius: 5px;

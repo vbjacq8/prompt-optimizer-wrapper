@@ -1,8 +1,6 @@
 package app;
 
 import javafx.animation.FadeTransition;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -18,27 +16,51 @@ import app.backend.compression.Simplifier;
 import app.backend.Evaluator;
 import app.backend.Parser;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 
 public class MainWindow {
 
-    // ── Utility Objects  ───────────────────────────────────────────────────────
+    // ── YOUR API KEY ──────────────────────────────────────────────────────
+    private static final String GROK_API_KEY_LITERAL = null;
+
+    private static String getApiKey() {
+        if (GROK_API_KEY_LITERAL != null && !GROK_API_KEY_LITERAL.isBlank()) return GROK_API_KEY_LITERAL;
+        String env = System.getenv("OPENAI_API_KEY");
+        return (env != null && !env.isBlank()) ? env : null;
+    }
+
+    // ── Utility Objects ───────────────────────────────────────────────────
     private final Parser parser         = new Parser();
     private final Simplifier simplifier = new Simplifier();
     private final Compressor compressor = new Compressor();
     private final Evaluator evaluator   = new Evaluator();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     // ── Root layout ───────────────────────────────────────────────────────
     private final BorderPane root = new BorderPane();
 
     // ── Editor panes ──────────────────────────────────────────────────────
-    private final TextArea inputArea  = new TextArea();
-    private final TextArea outputArea = new TextArea();
+    private final TextArea inputArea         = new TextArea();
+    private final TextArea outputArea        = new TextArea();
+    private final TextArea gptOriginalArea   = new TextArea();
+    private final TextArea gptCompressedArea = new TextArea();
 
     // ── Stat labels ───────────────────────────────────────────────────────
     private final Label statOriginal   = new Label("—");
     private final Label statCompressed = new Label("—");
     private final Label statSaved      = new Label("—");
     private final Label statPercent    = new Label("—");
+
+    // ── GPT Stat labels ───────────────────────────────────────────────────
+    private final Label statGptOriginal   = new Label("—");
+    private final Label statGptCompressed = new Label("—");
+    private final Label statGptSaved      = new Label("—");
+    private final Label statGptPercent    = new Label("—");
 
     // ── Buttons ───────────────────────────────────────────────────────────
     private final Button btnOptimize       = new Button("⚡  OPTIMIZE");
@@ -52,6 +74,7 @@ public class MainWindow {
     // ── State ─────────────────────────────────────────────────────────────
     private String lastOriginal   = "";
     private String lastCompressed = "";
+    private int    gptDoneCount   = 0;
 
     // ─────────────────────────────────────────────────────────────────────
     public MainWindow() {
@@ -80,53 +103,75 @@ public class MainWindow {
         subtitle.getStyleClass().add("subtitle");
 
         VBox titleCol = new VBox(2, title, subtitle);
-
         statusLabel.getStyleClass().add("status");
         HBox.setHgrow(titleCol, Priority.ALWAYS);
 
         HBox header = new HBox(titleCol, statusLabel);
         header.setAlignment(Pos.CENTER_LEFT);
-
-        // Divider line beneath header
         return header;
     }
 
     // ── Stat cards row ────────────────────────────────────────────────────
     private HBox buildStatCards() {
-        HBox row = new HBox(10,
-            statCard("ORIGINAL TOKENS",    statOriginal),
-            statCard("COMPRESSED TOKENS",  statCompressed),
-            statCard("TOKENS SAVED",       statSaved),
-            statCard("REDUCTION",          statPercent)
-        );
-        row.setPadding(new Insets(12, 0, 0, 0));
-        return row;
-    }
+    HBox row = new HBox(10,
+        statCard("ORIGINAL PROMPT TOKENS",    statOriginal),
+        statCard("COMPRESSED PROMPT TOKENS",  statCompressed),
+        statCard("PROMPT TOKENS SAVED",       statSaved),
+        statCard("PROMPT REDUCTION %",        statPercent)
+    );
+    row.setPadding(new Insets(12, 0, 0, 0));
+    return row;
+}
+
+    private HBox buildGptStatCards() {
+    HBox row = new HBox(10,
+        statCard("ORIGINAL RESPONSE TOKENS",    statGptOriginal),
+        statCard("COMPRESSED RESPONSE TOKENS",  statGptCompressed),
+        statCard("RESPONSE TOKENS SAVED",       statGptSaved),
+        statCard("RESPONSE REDUCTION %",        statGptPercent)
+    );
+    row.setPadding(new Insets(12, 0, 0, 0));
+    return row;
+}
 
     private VBox statCard(String labelText, Label valueLabel) {
-        Label lbl = new Label(labelText);
-        lbl.getStyleClass().add("card-label");
-        valueLabel.getStyleClass().add("card-value");
+    Label lbl = new Label(labelText);
+    lbl.getStyleClass().add("card-label");
+    valueLabel.getStyleClass().add("card-value");
 
-        VBox card = new VBox(2, lbl, valueLabel);
-        card.getStyleClass().add("stat-card");
-        card.setPrefHeight(68);
-        HBox.setHgrow(card, Priority.ALWAYS);
-        card.setMaxWidth(Double.MAX_VALUE);
-        return card;
-    }
+    VBox card = new VBox(2, lbl, valueLabel);
+    card.getStyleClass().add("stat-card");
+    
+    // CHANGE THIS: Set MinHeight so they can't be squished
+    card.setMinHeight(70); 
+    card.setPrefHeight(70);
+    
+    card.setAlignment(Pos.CENTER_LEFT); // Ensure text stays centered
+    card.setPadding(new Insets(10));
+    
+    HBox.setHgrow(card, Priority.ALWAYS);
+    card.setMaxWidth(Double.MAX_VALUE);
+    return card;
+}
 
-    // ── Center (editors) ──────────────────────────────────────────────────
+    // ── Center ────────────────────────────────────────────────────────────
     private VBox buildCenter() {
-        HBox editors = buildEditors();
-        HBox stats   = buildStatCards();
-        VBox center  = new VBox(0, stats, editors);
-        VBox.setVgrow(editors, Priority.ALWAYS);
-        return center;
-    }
+    HBox stats    = buildStatCards();
+    HBox editors  = buildEditors();
+    HBox gptStats = buildGptStatCards(); // Move these above the response row for better UX
+    HBox gptRow   = buildGptRow();
+    
+    // Add spacing (15) between the rows
+    VBox center = new VBox(15, stats, editors, gptStats, gptRow);
+    
+    // Ensure the editors share the vertical space
+    VBox.setVgrow(editors, Priority.ALWAYS);
+    VBox.setVgrow(gptRow,  Priority.ALWAYS);
+    
+    return center;
+}
 
     private HBox buildEditors() {
-        // Input
         Label inputLabel = new Label("INPUT PROMPT");
         inputLabel.getStyleClass().add("section-label");
         inputArea.setPromptText("Paste your prompt here...");
@@ -136,7 +181,6 @@ public class MainWindow {
         VBox.setVgrow(inputArea, Priority.ALWAYS);
         leftPane.setPadding(new Insets(12, 6, 0, 0));
 
-        // Output
         Label outputLabel = new Label("COMPRESSED PROMPT");
         outputLabel.getStyleClass().add("section-label");
         outputArea.setPromptText("Compressed output will appear here...");
@@ -150,9 +194,37 @@ public class MainWindow {
         HBox editors = new HBox(leftPane, buildVerticalDivider(), rightPane);
         HBox.setHgrow(leftPane,  Priority.ALWAYS);
         HBox.setHgrow(rightPane, Priority.ALWAYS);
-        VBox.setVgrow(editors, Priority.ALWAYS);
-        editors.setPadding(new Insets(0, 0, 0, 0));
+        VBox.setVgrow(editors,   Priority.ALWAYS);
         return editors;
+    }
+
+    // ── Groq response row ─────────────────────────────────────────────────
+    private HBox buildGptRow() {
+        Label gptOrigLabel = new Label("GROQ → ORIGINAL PROMPT");
+        gptOrigLabel.getStyleClass().add("section-label");
+        gptOriginalArea.setPromptText("Groq's response to your original prompt will appear here...");
+        gptOriginalArea.getStyleClass().add("editor");
+        gptOriginalArea.setEditable(false);
+        gptOriginalArea.setWrapText(true);
+        VBox gptLeftPane = new VBox(6, gptOrigLabel, gptOriginalArea);
+        VBox.setVgrow(gptOriginalArea, Priority.ALWAYS);
+        gptLeftPane.setPadding(new Insets(12, 6, 0, 0));
+
+        Label gptCompLabel = new Label("GROQ → COMPRESSED PROMPT");
+        gptCompLabel.getStyleClass().add("section-label");
+        gptCompressedArea.setPromptText("Groq's response to your compressed prompt will appear here...");
+        gptCompressedArea.getStyleClass().add("editor");
+        gptCompressedArea.setEditable(false);
+        gptCompressedArea.setWrapText(true);
+        VBox gptRightPane = new VBox(6, gptCompLabel, gptCompressedArea);
+        VBox.setVgrow(gptCompressedArea, Priority.ALWAYS);
+        gptRightPane.setPadding(new Insets(12, 0, 0, 6));
+
+        HBox gptRow = new HBox(gptLeftPane, buildVerticalDivider(), gptRightPane);
+        HBox.setHgrow(gptLeftPane,  Priority.ALWAYS);
+        HBox.setHgrow(gptRightPane, Priority.ALWAYS);
+        VBox.setVgrow(gptRow,       Priority.ALWAYS);
+        return gptRow;
     }
 
     private Region buildVerticalDivider() {
@@ -206,30 +278,24 @@ public class MainWindow {
         btnOptimize.setDisable(true);
         btnOptimize.setText("OPTIMIZING...");
         outputArea.clear();
+        gptOriginalArea.clear();
+        gptCompressedArea.clear();
 
-        // ── Background task so UI stays responsive ────────────────────────
         Task<CompressionResult> task = new Task<>() {
             @Override
             protected CompressionResult call() {
                 System.out.println("INPUT: " + text);
-    String simplified = simplifier.simplify(parser.parse(text));
-    System.out.println("SIMPLIFIED: " + simplified);
-    String compressed = compressor.compress(simplified);
-    System.out.println("COMPRESSED: " + compressed);
-    Evaluator.EvaluationResult evalResult = evaluator.evaluate(text, compressed);
-    return new CompressionResult(
-        text, compressed,
-        evalResult.originalTokens,
-        evalResult.compressedTokens
-    );
-
-                // ── WIRE YOUR BACKEND HERE ────────────────────────────────
-                // Replace mockCompress() with:
-                //   String compressed = RegexCompressor.compress(text);
-                //   compressed = Simplifier.simplify(compressed);
-                //   int[] tokens = TokenEvaluator.evaluate(text, compressed);
-                //   return new CompressionResult(text, compressed, tokens[0], tokens[1]);
-                //return mockCompress(text);
+                String simplified = simplifier.simplify(parser.parse(text));
+                System.out.println("SIMPLIFIED: " + simplified);
+                String compressed = compressor.compress(simplified);
+                System.out.println("COMPRESSED: " + compressed);
+                Evaluator.EvaluationResult evalResult = evaluator.evaluate(text, compressed);
+                
+                return new CompressionResult(
+                    text, compressed,
+                    evalResult.originalTokens,
+                    evalResult.compressedTokens
+                );
             }
         };
 
@@ -244,27 +310,112 @@ public class MainWindow {
             statSaved.setText(String.format("%,d", r.saved()));
             statPercent.setText(r.percent() + "%");
 
-            btnOptimize.setDisable(false);
-            btnOptimize.setText("⚡  OPTIMIZE");
             btnCopyCompressed.setDisable(false);
             btnCopyOriginal.setDisable(false);
 
-            setStatus("DONE  ·  " + r.percent() + "% REDUCTION");
+            setStatus("COMPRESSION DONE · QUERYING GROQ...");
+            callChatGptParallel(r.original, r.compressed);
         });
 
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
-            ex.printStackTrace(); // prints full stack trace to terminal
+            ex.printStackTrace();
             setStatus("ERROR: " + ex.getMessage());
             btnOptimize.setDisable(false);
             btnOptimize.setText("⚡  OPTIMIZE");
-            });
+        });
 
         Thread t = new Thread(task);
         t.setDaemon(true);
         t.start();
     }
 
+    // ── Groq API ──────────────────────────────────────────────────────────
+    private void callChatGptParallel(String original, String compressed) {
+        String apiKey = getApiKey();
+        if (apiKey == null) {
+            String msg = "⚠ No API key found.\n\nSet OPENAI_API_KEY_LITERAL in MainWindow.java.";
+            Platform.runLater(() -> {
+                gptOriginalArea.setText(msg);
+                gptCompressedArea.setText(msg);
+                btnOptimize.setDisable(false);
+                btnOptimize.setText("⚡  OPTIMIZE");
+                setStatus("DONE (no API key)");
+            });
+            return;
+        }
+
+        gptDoneCount = 0;
+        Task<String> origTask = buildGptTask(original, apiKey);
+        Task<String> compTask = buildGptTask(compressed, apiKey);
+
+        origTask.setOnSucceeded(e -> Platform.runLater(() -> { gptOriginalArea.setText(origTask.getValue());   onOneGptDone(); }));
+        origTask.setOnFailed(e ->   Platform.runLater(() -> { gptOriginalArea.setText("Error: " + origTask.getException().getMessage()); onOneGptDone(); }));
+        compTask.setOnSucceeded(e -> Platform.runLater(() -> { gptCompressedArea.setText(compTask.getValue()); onOneGptDone(); }));
+        compTask.setOnFailed(e ->   Platform.runLater(() -> { gptCompressedArea.setText("Error: " + compTask.getException().getMessage()); onOneGptDone(); }));
+
+        new Thread(origTask) {{ setDaemon(true); }}.start();
+        new Thread(compTask) {{ setDaemon(true); }}.start();
+    }
+
+    private void onOneGptDone() {
+        if (++gptDoneCount >= 2) {
+            gptDoneCount = 0;
+            btnOptimize.setDisable(false);
+            btnOptimize.setText("⚡  OPTIMIZE");
+            setStatus("DONE · GROQ RESPONSES LOADED");
+
+            String origResponse = gptOriginalArea.getText();
+            String compResponse = gptCompressedArea.getText();
+            int origTokens = origResponse.isBlank() ? 0 : origResponse.split("\\s+").length;
+            int compTokens = compResponse.isBlank() ? 0 : compResponse.split("\\s+").length;
+            int saved = origTokens - compTokens;
+            double percent = origTokens == 0 ? 0 : Math.round(((double) saved / origTokens) * 1000.0) / 10.0;
+
+            statGptOriginal.setText(String.format("%,d", origTokens));
+            statGptCompressed.setText(String.format("%,d", compTokens));
+            statGptSaved.setText(String.format("%,d", saved));
+            statGptPercent.setText(percent + "%");
+        }
+    }
+
+    private Task<String> buildGptTask(String prompt, String apiKey) {
+        return new Task<>() {
+            @Override
+            protected String call() throws IOException, InterruptedException {
+                String escaped = prompt.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n").replace("\r","\\r").replace("\t","\\t");
+                String body = "{\"model\":\"llama-3.3-70b-versatile\",\"messages\":[{\"role\":\"user\",\"content\":\"" + escaped + "\"}],\"max_tokens\":1024}";
+                HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.groq.com/openai/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                return parseGptResponse(resp.body());
+            }
+        };
+    }
+
+    private String parseGptResponse(String json) {
+        if (json.contains("\"error\"")) {
+            int m = json.indexOf("\"message\":"); if (m != -1) { int s = json.indexOf("\"", m+10)+1; int e = json.indexOf("\"", s); if (s>0&&e>s) return "API Error: "+json.substring(s,e); } return "API Error: "+json;
+        }
+        String marker = "\"content\":";
+        int idx = json.indexOf(marker);
+        if (idx == -1) return "Unexpected response:\n" + json;
+        int start = json.indexOf("\"", idx + marker.length()) + 1;
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c=='\\' && i+1<json.length()) { char n=json.charAt(++i); switch(n){case '"'->sb.append('"');case '\\'->sb.append('\\');case 'n'->sb.append('\n');case 'r'->sb.append('\r');case 't'->sb.append('\t');default->sb.append(c);} }
+            else if (c=='"') break;
+            else sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
     private void copyToClipboard(String text, String confirmMsg) {
         ClipboardContent content = new ClipboardContent();
         content.putString(text);
@@ -275,11 +426,18 @@ public class MainWindow {
     private void clearAll() {
         inputArea.clear();
         outputArea.clear();
+        gptOriginalArea.clear();
+        gptCompressedArea.clear();
+        gptDoneCount = 0;
         lastOriginal = lastCompressed = "";
         statOriginal.setText("—");
         statCompressed.setText("—");
         statSaved.setText("—");
         statPercent.setText("—");
+        statGptOriginal.setText("—");
+        statGptCompressed.setText("—");
+        statGptSaved.setText("—");
+        statGptPercent.setText("—");
         btnCopyCompressed.setDisable(true);
         btnCopyOriginal.setDisable(true);
         setStatus("READY");
@@ -294,16 +452,6 @@ public class MainWindow {
             ft.play();
         });
     }
-
-    // ── Mock backend (replace with real calls) ────────────────────────────
-    private CompressionResult mockCompress(String text) {
-        try { Thread.sleep(600); } catch (InterruptedException ignored) {}
-        String compressed = text.replaceAll("(?i)\\b(please|can you|could you|I want you to|I need you to)\\b\\s*", "");
-        compressed = compressed.replaceAll("\\s+", " ").trim();
-        int origTokens = text.split("\\s+").length;
-        int compTokens = compressed.split("\\s+").length;
-        return new CompressionResult(text, compressed, origTokens, compTokens);
-     }
 
     // ── Result record ─────────────────────────────────────────────────────
     public static class CompressionResult {
